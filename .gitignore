@@ -1,9 +1,9 @@
-# backend
+# backend (root-anchored: runtime app config holds DSN/secrets; do not un-anchor)
 /data/
 *.db
 *.db-wal
 *.db-shm
-config.json
+/config.json
 scheduler_state.json
 __pycache__/
 *.pyc
