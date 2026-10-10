@@ -133,8 +133,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | METRIC-03 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 33 total
-- Mapped to phases: 33
+- v1 requirements: 39 total
+- Mapped to phases: 39
 - Unmapped: 0 ✓
 
 ---
