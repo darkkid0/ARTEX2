@@ -369,6 +369,30 @@ Use these entry points:
 Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
 <!-- GSD:workflow-end -->
 
+## Quality Gates（质量门禁 — 强制）
+
+`.planning/QUALITY_GATES.md` 是本项目的强制性工作流规则（AI Development Review Protocol）。讨论/上下文捕获、规划与实施产出的自审加独立审查门禁适用于：阶段讨论/上下文工件、阶段 PLAN、plan/任务拆分文档、quick task 计划、实施产出、文档产出，以及任何声称完成的状态更新。完整定义、证据格式、豁免与过渡条款以该文件为准，本节仅为使用索引。
+
+**门禁一览（fail-closed：证据缺失或未达 3 轮连续通过 = 禁止进入工作流下一步）：**
+
+| Gate | 拦截点 | 证据文件 |
+|------|--------|----------|
+| Gate 0 — Discuss/Context Readiness | 阶段讨论/上下文工件被视为就绪、可进入规划 | 随上下文工件记录 |
+| Gate R — Research Readiness | `{N}-RESEARCH.md` 被 pattern-mapper 或 planner 消费（先 `--research-phase` 产出 RESEARCH.md，过 Gate R 后才允许全量 plan） | `{N}-GATE-R-REVIEW.md` |
+| Gate P — Patterns Readiness | `{N}-PATTERNS.md` 被 planner 消费（磁盘版必须与受审候选字节一致） | `{N}-GATE-P-REVIEW.md` |
+| Gate A — Plan Readiness | 任何新建/更新的 PLAN.md 进入实施 | 随 plan/quick 目录记录 |
+| Gate B — Implementation Completion | 实施产出提交、状态标记完成（代码与纯文档输出同权，quick task 不豁免） | `<plan-id>-GATE-B.md` / `<quick-id>-GATE-B.md` / `<phase-id>-PHASE-GATE-B-REVIEW.md`（独立文件背书） |
+
+**硬性规则（摘自 QUALITY_GATES.md，冲突时以原文为准）：**
+
+- **三连续通过 + 归零语义**：每个 gate 需自审 + 独立审查 3 轮连续无确认问题；任何确认修复或实质性变更把连续通过计数归零并重审，证据文件必须显式记录重启。
+- **Gate B 是文件背书 gate**：独立证据文件必须在第一轮独立审查前创建/打开，逐轮追加（轮次、首行 PASS/ISSUES、审查范围、裁决、确认修复的严重度/根因/修复/验证命令与结果、归零记录）；SUMMARY.md、状态行、roadmap 行、commit message、最终回复只能引用，不能替代磁盘证据。缺证据 = 任务/plan/phase 不可提交、不算完成，即使测试全绿。
+- **严禁伪造独立审查 PASS（硬性红线）**：审查者必须与作者/实施者分离；每轮 PASS 必须可追溯到真实执行的独立审查（独立 subagent 的真实输出或人工确认）；不得虚构审查结论或轮次。违反 = 相关 gate 全部重跑、计数归零、相关任务不得提交，并如实记录违规与整改。
+- **独立审查优先使用 gsd-core 能力**：先检查 `gsd-code-reviewer` / `gsd-plan-checker` / `gsd-verifier` / `gsd-secure-phase` / `gsd-validate-phase` 等内置审查/校验 agent 与 skill；仅当不存在适用能力才允许通用 subagent，并在 gate 证据中记录理由。
+- **MCP 工具协调**：代码发现与结构溯源按 `codebase-memory-mcp > CodeGraph > shell search` 顺序；gate 证据记录各工具覆盖的责任面，或记录纯文档/只读任务不适用的原因。
+- **禁止一炮到底**：除非满足第二段复用豁免（RESEARCH.md/PATTERNS.md 已在磁盘且 Gate R/P 证据齐全），禁止单次运行完整 research→PLAN.md 链路；存量无证据工件不豁免——消费前必须补跑 Gate R/P 至 3/3。
+- **Bypass**：仅限用户明确指令点名豁免内容与理由，并记录在相关 plan、summary 或 state 文档中。
+
 <!-- GSD:profile-start -->
 
 ## Developer Profile
