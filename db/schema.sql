@@ -1112,6 +1112,7 @@ CREATE TABLE IF NOT EXISTS intercept_pending (
 );
 CREATE INDEX IF NOT EXISTS idx_intercept_pending_status ON intercept_pending(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_intercept_pending_task   ON intercept_pending(task_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_intercept_pending_created ON intercept_pending(created_at DESC);
 -- 补旧库:reason 列(已发版,加列要带 IF NOT EXISTS)。
 ALTER TABLE intercept_pending ADD COLUMN IF NOT EXISTS reason TEXT NOT NULL DEFAULT '';
 -- Detail payloads are lazy-loaded; NULL preserves the meaning of legacy history.
@@ -1119,6 +1120,10 @@ ALTER TABLE intercept_pending ADD COLUMN IF NOT EXISTS audit JSONB;
 ALTER TABLE intercept_pending ADD COLUMN IF NOT EXISTS decision_source TEXT NOT NULL DEFAULT '';
 UPDATE intercept_pending SET decision_source=CASE WHEN rule_id IS NOT NULL THEN 'rule'
  WHEN reason LIKE '[模型]%' THEN 'model' ELSE 'unknown' END WHERE decision_source='';
+-- 审批请求的初判来源可能是规则/模型，但最终由用户允许或拒绝；保留最终人工判定来源。
+UPDATE intercept_pending SET decision_source='manual'
+ WHERE decision_source <> 'manual'
+   AND (audit->>'decision_reason' LIKE '人工允许%' OR audit->>'decision_reason' LIKE '人工拒绝%');
 
 -- =====================================================================
 -- L. 漏洞发现持久化
@@ -1237,17 +1242,25 @@ CREATE TABLE IF NOT EXISTS side_question_sessions (
     task_id BIGINT REFERENCES tasks(id) ON DELETE CASCADE,
     exploration_id BIGINT REFERENCES explorations(id) ON DELETE CASCADE,
     intent_id BIGINT REFERENCES exploration_nodes(id) ON DELETE CASCADE,
+    approval_id BIGINT REFERENCES intercept_pending(id) ON DELETE CASCADE,
     run_id BIGINT NOT NULL,
     version BIGINT NOT NULL,
     snapshot JSONB NOT NULL,
     generation BIGINT NOT NULL DEFAULT 0,
-    CHECK ((conversation_id IS NOT NULL AND task_id IS NULL AND exploration_id IS NULL AND intent_id IS NULL)
+    CHECK (approval_id IS NOT NULL OR
+        (conversation_id IS NOT NULL AND task_id IS NULL AND exploration_id IS NULL AND intent_id IS NULL)
         OR (conversation_id IS NULL AND task_id IS NOT NULL AND exploration_id IS NOT NULL))
 );
+ALTER TABLE side_question_sessions ADD COLUMN IF NOT EXISTS approval_id BIGINT REFERENCES intercept_pending(id) ON DELETE CASCADE;
+ALTER TABLE side_question_sessions DROP CONSTRAINT IF EXISTS side_question_sessions_check;
+ALTER TABLE side_question_sessions ADD CONSTRAINT side_question_sessions_check CHECK (approval_id IS NOT NULL OR
+    (conversation_id IS NOT NULL AND task_id IS NULL AND exploration_id IS NULL AND intent_id IS NULL)
+    OR (conversation_id IS NULL AND task_id IS NOT NULL AND exploration_id IS NOT NULL));
 CREATE INDEX IF NOT EXISTS idx_side_sessions_conv ON side_question_sessions(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_side_sessions_task ON side_question_sessions(task_id);
 CREATE INDEX IF NOT EXISTS idx_side_sessions_exp ON side_question_sessions(exploration_id);
 CREATE INDEX IF NOT EXISTS idx_side_sessions_intent ON side_question_sessions(intent_id);
+CREATE INDEX IF NOT EXISTS idx_side_sessions_approval ON side_question_sessions(approval_id);
 
 CREATE TABLE IF NOT EXISTS side_question_requests (
     id TEXT PRIMARY KEY,
