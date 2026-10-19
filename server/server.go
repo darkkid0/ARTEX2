@@ -704,6 +704,8 @@ func (s *Server) Handler() http.Handler {
 
 	// 页面一键更新。走的是默认的 JWT 鉴权（auth.go 只放行 /api/auth/* 和
 	// /api/health），所以这几个改动程序自身的接口天然需要登录。
+	mux.HandleFunc("GET /api/update/settings", s.getUpdateSettings)
+	mux.HandleFunc("PUT /api/update/settings", s.putUpdateSettings)
 	mux.HandleFunc("GET /api/update/check", s.updateCheck)
 	mux.HandleFunc("POST /api/update/apply", s.updateApply)
 	mux.HandleFunc("POST /api/update/rollback", s.updateRollback)
@@ -715,6 +717,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/schedules", s.createSchedule)
 	mux.HandleFunc("GET /api/schedules/{id}", s.getSchedule)
 	mux.HandleFunc("PATCH /api/schedules/{id}", s.updateSchedule)
+	mux.HandleFunc("PATCH /api/schedules/{id}/remark", s.updateScheduleMetadata)
+	mux.HandleFunc("PATCH /api/schedules/{id}/metadata", s.updateScheduleMetadata)
 	mux.HandleFunc("DELETE /api/schedules/{id}", s.deleteSchedule)
 	mux.HandleFunc("POST /api/schedules/{id}/pause", s.pauseSchedule)
 	mux.HandleFunc("POST /api/schedules/{id}/resume", s.resumeSchedule)
