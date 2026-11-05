@@ -226,13 +226,12 @@ func (t *ToolSet) AddHintTool() actool.CoreTool            { return t.addHint() 
 func (t *ToolSet) SetEnrich(e EnrichTrigger) { t.enrich = e }
 
 // SetOwnerNode sets the exploration node that writes anchor to (worker: its
-// intent node; planner/main: the begin root). Assets created/referenced while
-// ownerNode is set are anchored to it as lineage (not visibility).
+// intent node; planner/main: the begin root). Anchors preserve explicit asset
+// references and make them available in this task context.
 func (t *ToolSet) SetOwnerNode(id int64) { t.ownerNode = id }
 
 // anchorOwner records a lineage edge from this run's owner node to an asset
-// (no-op if unset). Provenance only — the asset graph is global and shared, so
-// this no longer affects which assets a task can read.
+// (no-op if unset). These explicit references also contribute to task visibility.
 func (t *ToolSet) anchorOwner(assetID int64) {
 	if t.ts != nil && t.ownerNode > 0 && assetID > 0 {
 		_ = t.ts.Anchor(t.ownerNode, assetID)
@@ -1054,6 +1053,24 @@ func (t *ToolSet) addOneIntent(it intentItem) (int64, error) {
 		priority = 5
 	}
 	anchors := pidList(it.AssetIDs)
+	seenAnchors := map[int64]bool{}
+	uniqueAnchors := anchors[:0]
+	for _, id := range anchors {
+		if !seenAnchors[id] {
+			seenAnchors[id] = true
+			uniqueAnchors = append(uniqueAnchors, id)
+		}
+	}
+	anchors = uniqueAnchors
+	if t.as != nil && t.taskID > 0 && len(anchors) > 0 {
+		visible, err := t.as.GetByIDsInScope(t.taskID, anchors)
+		if err != nil {
+			return 0, fmt.Errorf("资产可见范围校验失败：%w", err)
+		}
+		if len(visible) != len(anchors) {
+			return 0, fmt.Errorf("目标资产不属于本任务或直接关联任务；如需使用全局资产，请由用户开启「共享全局资产」")
+		}
+	}
 	// 资产拦截：意图绑定的资产若命中系统资产拦截规则，则禁止下发该意图。
 	if t.as != nil && len(anchors) > 0 {
 		hits, err := t.as.CheckAssetsIntercept(t.taskID, anchors)
@@ -1208,7 +1225,7 @@ func (t *ToolSet) proveGoal() actool.CoreTool {
 }
 
 func (t *ToolSet) goalMet() actool.CoreTool {
-	return writeTool("goal_met", "【立即结束整个任务】——仅当你确认任务的【全部目标都已真正达成、整体收官】时才调（注意是任务【整体】完成；仅仅达成了其中某一个目标/某一个 flag/某一个漏洞【不算】——那种情况用 prove_goal 标记该目标即可）。⚠️它不是用来“结束本轮规划”的：本轮没有新意图要派、或在等 worker 产出，都【直接结束本轮即可，不要调本工具】（0 个意图是完全正常的）。正常判定优先用 prove_goal 逐个证明目标；goal_met 只是绕过逐个证明、直接从全局收官的手段。",
+	return writeTool("goal_met", "【立即结束整个任务】——仅当你确认任务的【全部目标都已真正达成、整体收官】时才调（注意是任务【整体】完成；仅仅达成了其中某一个目标/某一个漏洞【不算】——那种情况用 prove_goal 标记该目标即可）。⚠️它不是用来“结束本轮规划”的：本轮没有新意图要派、或在等 worker 产出，都【直接结束本轮即可，不要调本工具】（0 个意图是完全正常的）。正常判定优先用 prove_goal 逐个证明目标；goal_met 只是绕过逐个证明、直接从全局收官的手段。",
 		obj(map[string]any{"reason": str("达成理由（必须是目标真正达成的证据，不能是“本轮无新方向”这类结束本轮的理由）")}, "reason"),
 		func(_ context.Context, in json.RawMessage) (actool.Result, error) {
 			var a struct{ Reason string }
