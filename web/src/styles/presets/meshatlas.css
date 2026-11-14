@@ -1,0 +1,969 @@
+/*
+label: Mesh Atlas
+value: meshatlas
+*/
+
+/* ==================================================================
+   Mesh Atlas —— 作战终端主题
+   取色与造型源自 lij768423-svg/meshatlas（805 行样式表逐节核对）。
+
+   设计语言提炼：
+   1) 零圆角——源站 805 行里 border-radius 出现 0 次。ARTEX 的 --radius-*
+      是 calc 派生的，必须连 sm/md/lg/xl/2xl/3xl/4xl 一起归零，
+      否则 calc(0 - 4px) 算出负值被浏览器丢弃，圆角反而残留。
+   2) 四角 L 形角标——源站注释 "panels and HUD corner ticks"，
+      8 个 linear-gradient 画四角各一对 12px 直角短线。
+   3) 1px 硬边框 + 虚线表嵌套——源站 56 处 1px、12 处 dashed、5 处 dotted。
+   4) 等宽字形承载数据，tabluar-nums 对齐数字。
+   5) 语义色只有两档：warn(#f2a93b) / bad(#ff5a52)，其余全是中性灰阶。
+   ================================================================== */
+
+:root[data-theme-preset="meshatlas"],
+.dark:root[data-theme-preset="meshatlas"] {
+  /* --- 零圆角：变量层归零（对 var() 型工具类有效） --- */
+  --radius: 0rem;
+  --radius-xs: 0rem;
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --radius-2xl: 0rem;
+  --radius-3xl: 0rem;
+  --radius-4xl: 0rem;
+
+  /* --- 字体分工在下方 :root 块统一声明（mono 用于数据、sans 用于叙述） --- */
+
+  /* --- 色阶：源站 --bg/--panel/--line/--fg 逐级换算为 oklch --- */
+  --background: oklch(0.1149 0 89.88); /* #050505 */
+  --foreground: oklch(0.9551 0 89.88); /* #f0f0f0 */
+  --card: oklch(0.1448 0 89.88); /* #0a0a0a */
+  --card-foreground: oklch(0.9551 0 89.88);
+  --popover: oklch(0.1448 0 89.88);
+  --popover-foreground: oklch(0.9551 0 89.88);
+  --primary: oklch(0.7871 0.1471 73.02); /* #f2a93b warn */
+  --primary-foreground: oklch(0.1149 0 89.88);
+  --secondary: oklch(0.1684 0 89.88); /* #0f0f0f panel-2 */
+  --secondary-foreground: oklch(0.7699 0 89.88); /* #b4b4b4 fg-2 */
+  --muted: oklch(0.1684 0 89.88);
+  --muted-foreground: oklch(0.5795 0 89.88); /* #7a7a7a fg-3 */
+  --accent: oklch(0.1957 0 89.88); /* #151515 hover */
+  --accent-foreground: oklch(0.9551 0 89.88);
+  --destructive: oklch(0.6872 0.202 26.59); /* #ff5a52 bad */
+  --border: oklch(0.2393 0 89.88); /* #1f1f1f line */
+  --input: oklch(0.2393 0 89.88);
+  --ring: oklch(0.7871 0.1471 73.02);
+  --chart-1: oklch(0.7871 0.1471 73.02);
+  --chart-2: oklch(0.6872 0.202 26.59);
+  --chart-3: oklch(0.8607 0.0977 76.43); /* #f6c987 */
+  --chart-4: oklch(0.7699 0 89.88);
+  --chart-5: oklch(0.5795 0 89.88);
+  --sidebar: oklch(0.1344 0 89.88); /* #080808 */
+  --sidebar-foreground: oklch(0.7699 0 89.88);
+  --sidebar-primary: oklch(0.7871 0.1471 73.02);
+  --sidebar-primary-foreground: oklch(0.1149 0 89.88);
+  --sidebar-accent: oklch(0.1957 0 89.88);
+  --sidebar-accent-foreground: oklch(0.9551 0 89.88);
+  --sidebar-border: oklch(0.2393 0 89.88);
+  --sidebar-ring: oklch(0.7871 0.1471 73.02);
+
+  /* 终端界面不用柔光阴影：层级靠边框，浮层只留 1px 硬边 + 深扩散 */
+  --shadow-2xs: 0 0 0 1px oklch(1 0 0 / 0.06);
+  --shadow-xs: 0 0 0 1px oklch(1 0 0 / 0.06);
+  --shadow-sm: 0 0 0 1px oklch(1 0 0 / 0.08);
+  --shadow: 0 0 0 1px oklch(1 0 0 / 0.08);
+  --shadow-md: 0 0 0 1px oklch(1 0 0 / 0.1);
+  --shadow-lg: 0 0 0 1px oklch(1 0 0 / 0.12), 0 12px 40px oklch(0 0 0 / 0.6);
+  --shadow-xl: 0 0 0 1px oklch(1 0 0 / 0.14), 0 18px 52px oklch(0 0 0 / 0.7);
+  --shadow-2xl: 0 0 0 1px oklch(1 0 0 / 0.16), 0 24px 80px oklch(0 0 0 / 0.7);
+}
+
+/* ------------------------------------------------------------------
+   背景纹理：40px 网格 + 2px 扫描线（源站 body::before / body::after）
+
+   踩过的坑（两个都必须避开）：
+   1) z-index:-1 —— 伪元素会沉到 <html> 背景之下。只要上层有任何不透明
+      底色（如 sidebar-wrapper 的 bg-sidebar），纹理就被彻底盖住，页面上
+      完全看不见。实测确认过。
+   2) app shell 里 SidebarInset 带 bg-background、sidebar-wrapper 带
+      bg-sidebar，两层不透明底同样会遮死纹理。
+
+   正确做法（与源站一致）：纹理用 z-index:0，外壳层统一 z-index:1 且底色透明，
+   让纹理从最底层透上来；面板自身不透明，自然把纹理遮住——这正好形成
+   「内容块浮于图纸之上」的层次感。
+------------------------------------------------------------------ */
+
+/* 1) 承载纹理的外壳层：透明 + 提升到纹理之上 */
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-wrapper"],
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-inset"],
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-inner"],
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-container"] {
+  background-color: transparent;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-wrapper"] {
+  position: relative;
+  z-index: 1;
+}
+
+/* SidebarInset 已是 position:relative 但没有 z-index，
+   在 z-index:0 的纹理层之上会处于同一层、按顺序可能被压住，这里显式抬高。 */
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-inset"] {
+  position: relative;
+  z-index: 1;
+}
+
+/* 2) 纹理层：z-index:0，铺在内容之下、根背景之上 */
+:root[data-theme-preset="meshatlas"] body {
+  background-color: var(--background);
+}
+
+:root[data-theme-preset="meshatlas"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(oklch(1 0 0 / 0.024) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(1 0 0 / 0.024) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+:root[data-theme-preset="meshatlas"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0 2px,
+    oklch(1 0 0 / 0.016) 2px 3px
+  );
+}
+
+/* ------------------------------------------------------------------
+   字体：优先用 ARTEX 已内置的 JetBrains Mono（next/font 变量
+   --font-jetbrains-mono），而非仅声明字体名等待系统命中。
+   未装载该字体时才回退到 SF Mono / Menlo。
+------------------------------------------------------------------ */
+
+/* 侧边抽屉式面板（如「旁路提问」workspace）：rounded-xl border bg-background shadow-2xl。
+   它虽是 absolute 浮层、不加角标，但仍需方角 + 主题描边，否则整块保持默认圆角外观。 */
+:root[data-theme-preset="meshatlas"] div[class*="bg-background"][class*="border"][class*="rounded-xl"]:not(
+    [data-slot]
+  ) {
+  border-radius: 0;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border), 0 18px 52px oklch(0 0 0 / 0.55);
+}
+
+/* 侧边面板内部的输入区、消息块 */
+:root[data-theme-preset="meshatlas"] div[class*="bg-background"][class*="border"][class*="rounded-lg"]:not(
+    [data-slot]
+  ):not([class*="absolute"]) {
+  border-radius: 0;
+  border: 0;
+  box-shadow: inset 0 0 0 1px oklch(0.3012 0 89.88);
+}
+
+/* ------------------------------------------------------------------
+   面板覆盖：ARTEX 里大量「面板」是手写的 div（26 处 bg-card），
+   并不走 <Card> 组件，因此没有 data-slot="card"，角标与描边漏掉。
+   sessions 页的会话分栏就是典型：`rounded-lg border bg-card`。
+
+   除 bg-card 外，还有一批用 bg-muted/<alpha> 的大面板（rounded-xl 级别），
+   典型如拦截审批页的分组容器 `rounded-xl border bg-muted/20 p-4`。
+   它们同样是面板，若不处理就会出现「外层只有细边框、内层表格却有角标」
+   的粗细不一致观感。这里用「rounded-xl 及以上」作为大面板的判据：
+   rounded-md / rounded 的多是 chip、代码框等内联小块，不纳入。
+
+   用属性子串选择器兜住这批写法。必须排除以下几类，否则角标会出现在错位置：
+     · absolute / fixed —— 浮动于内容之上的小卡片，加角标会喧宾夺主
+     · sticky           —— 表头 / 行首的吸附列，本身不是面板
+     · backdrop         —— 半透明毛玻璃浮层
+     · bg-card/         —— 带透明度的浮层（Tailwind 的 /95 语法）
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] div[class*="bg-card"][class*="border"][class*="rounded"]:not(
+    [class*="absolute"]
+  ):not([class*="fixed"]):not([class*="sticky"]):not([class*="backdrop"]):not(
+    [class*="bg-card/"]
+  ):not([data-slot]) {
+  position: relative;
+  /* 必须清掉原有 border：这批容器已带 `border`（1px 实线），
+     若再叠 inset shadow 会变成 2px 双线，而角标只有 1px —— 边宽角细对不上。 */
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border);
+  background-image: linear-gradient(180deg, oklch(1 0 0 / 0.022), oklch(1 0 0 / 0.008));
+}
+
+/* 面板内部的分组块（bg-muted + border，对应源站 .grp）：
+   1px 实线、无角标、无底色渐变。它们不属于面板层级 ——
+   若按面板处理，正文区会凭空多出一层底色，与其他页面不一致。 */
+:root[data-theme-preset="meshatlas"] div[class*="bg-muted"][class*="border"][class*="rounded"]:not(
+    [data-slot]
+  ):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"]) {
+  /* 务必连 background-color 一起清：
+     bg-muted/20 自带一层浅色块，只清 background-image 的话它依然可见，
+     正文区就会比其他页面多出一层底色。 */
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+:root[data-theme-preset="meshatlas"] div[class*="bg-muted"][class*="border"][class*="rounded"]:not(
+    [data-slot]
+  ):not([class*="absolute"]):not([class*="fixed"]):not([class*="sticky"])::before {
+  content: none;
+}
+
+:root[data-theme-preset="meshatlas"] div[class*="bg-card"][class*="border"][class*="rounded"]:not(
+    [class*="absolute"]
+  ):not([class*="fixed"]):not([class*="sticky"]):not([class*="backdrop"]):not(
+    [class*="bg-card/"]
+  ):not([data-slot])::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --tick: oklch(0.4202 0 89.88);
+  --tick-len: 12px;
+  background:
+    linear-gradient(var(--tick), var(--tick)) top left / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top left / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / 1px var(--tick-len) no-repeat;
+}
+
+/* ------------------------------------------------------------------
+   零圆角：必须覆盖工具类本身，不能只改变量。
+
+   ARTEX 的 globals.css 用 @theme inline 定义 --radius-*，Tailwind 会把
+   calc 表达式**内联**进工具类，产物是 `.rounded-xl{border-radius:calc(var(--radius) + 4px)}`。
+   因此即便把 --radius-xl 覆盖成 0rem 也无效——工具类压根不引用它，
+   calc(0rem + 4px) 恒等于 4px。于是 Card(rounded-xl) 有 4px 圆角、
+   Button/Table(rounded-lg) 是 0，界面上就出现两种边框并存。
+   这里直接按工具类重置数值。
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] .rounded,
+:root[data-theme-preset="meshatlas"] .rounded-xs,
+:root[data-theme-preset="meshatlas"] .rounded-sm,
+:root[data-theme-preset="meshatlas"] .rounded-md,
+:root[data-theme-preset="meshatlas"] .rounded-lg,
+:root[data-theme-preset="meshatlas"] .rounded-xl,
+:root[data-theme-preset="meshatlas"] .rounded-2xl,
+:root[data-theme-preset="meshatlas"] .rounded-3xl,
+:root[data-theme-preset="meshatlas"] .rounded-4xl,
+:root[data-theme-preset="meshatlas"] .rounded-t,
+:root[data-theme-preset="meshatlas"] .rounded-b,
+:root[data-theme-preset="meshatlas"] .rounded-l,
+:root[data-theme-preset="meshatlas"] .rounded-r,
+:root[data-theme-preset="meshatlas"] .rounded-s,
+:root[data-theme-preset="meshatlas"] .rounded-e,
+:root[data-theme-preset="meshatlas"] .rounded-tl,
+:root[data-theme-preset="meshatlas"] .rounded-tr,
+:root[data-theme-preset="meshatlas"] .rounded-bl,
+:root[data-theme-preset="meshatlas"] .rounded-br,
+:root[data-theme-preset="meshatlas"] .rounded-ss,
+:root[data-theme-preset="meshatlas"] .rounded-se,
+:root[data-theme-preset="meshatlas"] .rounded-es,
+:root[data-theme-preset="meshatlas"] .rounded-ee,
+:root[data-theme-preset="meshatlas"] .rounded-t-lg,
+:root[data-theme-preset="meshatlas"] .rounded-b-lg,
+:root[data-theme-preset="meshatlas"] .rounded-l-lg,
+:root[data-theme-preset="meshatlas"] .rounded-r-lg,
+:root[data-theme-preset="meshatlas"] .rounded-s-lg,
+:root[data-theme-preset="meshatlas"] .rounded-e-lg,
+:root[data-theme-preset="meshatlas"] .rounded-t-xl,
+:root[data-theme-preset="meshatlas"] .rounded-b-xl,
+:root[data-theme-preset="meshatlas"] .rounded-l-xl,
+:root[data-theme-preset="meshatlas"] .rounded-r-xl,
+:root[data-theme-preset="meshatlas"] .rounded-tl-xl,
+:root[data-theme-preset="meshatlas"] .rounded-tr-xl,
+:root[data-theme-preset="meshatlas"] .rounded-bl-xl,
+:root[data-theme-preset="meshatlas"] .rounded-br-xl,
+:root[data-theme-preset="meshatlas"] .rounded-t-sm,
+:root[data-theme-preset="meshatlas"] .rounded-b-sm,
+:root[data-theme-preset="meshatlas"] .rounded-l-sm,
+:root[data-theme-preset="meshatlas"] .rounded-r-sm,
+:root[data-theme-preset="meshatlas"] .rounded-s-sm,
+:root[data-theme-preset="meshatlas"] .rounded-e-sm,
+:root[data-theme-preset="meshatlas"] .rounded-tl-sm,
+:root[data-theme-preset="meshatlas"] .rounded-tr-sm,
+:root[data-theme-preset="meshatlas"] .rounded-bl-sm,
+:root[data-theme-preset="meshatlas"] .rounded-br-sm,
+:root[data-theme-preset="meshatlas"] .rounded-t-md,
+:root[data-theme-preset="meshatlas"] .rounded-b-md,
+:root[data-theme-preset="meshatlas"] .rounded-l-md,
+:root[data-theme-preset="meshatlas"] .rounded-r-md,
+:root[data-theme-preset="meshatlas"] .rounded-s-md,
+:root[data-theme-preset="meshatlas"] .rounded-e-md,
+:root[data-theme-preset="meshatlas"] .rounded-tl-md,
+:root[data-theme-preset="meshatlas"] .rounded-tr-md,
+:root[data-theme-preset="meshatlas"] .rounded-bl-md,
+:root[data-theme-preset="meshatlas"] .rounded-br-md {
+  border-radius: 0;
+}
+
+/* 组件级兜底：这些 data-slot 对应的元素一律方角，不依赖具体工具类 */
+:root[data-theme-preset="meshatlas"] [data-slot="card"],
+:root[data-theme-preset="meshatlas"] [data-slot="card-header"],
+:root[data-theme-preset="meshatlas"] [data-slot="card-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="card-footer"],
+:root[data-theme-preset="meshatlas"] [data-slot="table-container"],
+:root[data-theme-preset="meshatlas"] [data-slot="badge"],
+:root[data-theme-preset="meshatlas"] [data-slot="button"],
+:root[data-theme-preset="meshatlas"] [data-slot="tabs-list"],
+:root[data-theme-preset="meshatlas"] [data-slot="tabs-trigger"] {
+  border-radius: 0;
+}
+
+/* ------------------------------------------------------------------
+   字体分工：源站用 --mono 承载数据、--sans 承载叙述性文本
+   （.d-sub/.note/.svc .ds/.empty/.iss-t 全部走 sans）。
+   JetBrains Mono 不含 CJK 字形，中文会回退到 "PingFang SC" 等系统字体，
+   因此叙述性段落必须显式交回 sans，否则中英混排的节奏会散掉。
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] {
+  /* --font-jetbrains-mono 由 next/font 注入（registry.ts 里已装载 woff2），
+     直接引用它比只写字体名字更可靠：后者依赖用户机器上恰好装了这个字体。 */
+  --font-mono: var(--font-jetbrains-mono), "SF Mono", ui-monospace, Menlo, Consolas,
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace;
+  --font-sans: var(--font-jetbrains-mono), "SF Mono", ui-monospace, Menlo, Consolas,
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="card-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="alert-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="empty-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="empty-title"],
+:root[data-theme-preset="meshatlas"] [data-slot="dialog-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="sheet-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="field-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="field-error"],
+:root[data-theme-preset="meshatlas"] [data-slot="item-description"] {
+  font-family: var(--font-sans);
+}
+
+/* ------------------------------------------------------------------
+   四角 L 形角标（HUD corner ticks）
+   每条边两笔：12px 横线 + 12px 竖线，四角共 8 个 gradient。
+
+   两条硬约束同时成立才能画出「与边框重合的加亮 L」：
+   1) 描边必须用 inset box-shadow，不能用 border —— border 占 1px 布局空间，
+      伪元素的 inset:0 从边框内侧起算，角标会与边框并排成 2px 双线台阶；
+      box-shadow 不占布局，伪元素正好压在描边上。
+   2) 伪元素必须 inset:0 而非 -1px —— Card 组件带 overflow-hidden，
+      负 inset 的角标会被整个裁掉（实测：overflow:hidden + inset:-1px = 角标消失）。
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="card"] {
+  position: relative;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--border);
+  /* background-image 而非 background 简写：Card 自带 bg-card，
+     简写会把背景色重置为 transparent。 */
+  background-image: linear-gradient(180deg, oklch(1 0 0 / 0.022), oklch(1 0 0 / 0.008));
+}
+
+/* 表格容器不加任何面板装饰。
+   [data-slot="table-container"] 是每张 <Table> 的固定外层包装，
+   若给它描边+角标+渐变底，页面里每张表都会变成一个「小面板」，
+   与那些把表格直接放在 Card / 页面里、本身没有边界的页面产生不一致。
+   源站表格同样没有背景和描边，只靠行分隔线与表头区分。 */
+:root[data-theme-preset="meshatlas"] [data-slot="table-container"] {
+  position: static;
+  border: 0;
+  box-shadow: none;
+  background-image: none;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="table-container"]::before {
+  content: none;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="card"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --tick: oklch(0.4202 0 89.88); /* #4d4d4d fg-4 */
+  --tick-len: 12px;
+  background:
+    linear-gradient(var(--tick), var(--tick)) top left / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top left / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / 1px var(--tick-len) no-repeat;
+}
+
+/* 旧的 ::before 尾段已删除 */
+
+/* Card 自带 ring-1 ring-foreground/10，会与我们的 inset 描边叠成两层。
+   这里把 ring 变量清零，描边统一由上面的 inset box-shadow 承担。
+   注意：不能写 box-shadow:none —— 那会把描边本身也抹掉，角标随即退回错位状态。 */
+:root[data-theme-preset="meshatlas"] [data-slot="card"] {
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+/* ------------------------------------------------------------------
+   Card：源站的 .ph 面板头 —— 34px 高、底部 1px 分隔、小字大写宽字距
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="card-header"] {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="card-title"] {
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--secondary-foreground);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="card-description"] {
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="card-footer"] {
+  border-top: 1px solid var(--border);
+}
+
+/* ------------------------------------------------------------------
+   表格：源站 .ptr/.lst 规范 —— 表头 11px 大写宽字距、行 1px 分隔、
+   数字右对齐等宽、hover 用 3.5% 白
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="table-head"] {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  font-weight: 400;
+  border-bottom: 1px solid var(--border);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="table-row"] {
+  border-color: var(--border);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="table-row"]:hover {
+  background: oklch(1 0 0 / 0.035);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="table-cell"] {
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="table"] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------
+   按钮：源站 .btn —— 30px 高、方角、12px 字、.06em 字距
+   ghost/outline 态是 1px line-2 描边 + fg-2 文字
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="button"] {
+  border-radius: 0;
+  letter-spacing: 0.06em;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="button"]:active:not([aria-haspopup]) {
+  transform: none;
+}
+
+/* ------------------------------------------------------------------
+   输入框：源站 .search —— 32px 高、#080808 底、1px line-2 描边、
+   focus 时边框提到 fg-3，不加发光环
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="input"],
+:root[data-theme-preset="meshatlas"] [data-slot="textarea"],
+:root[data-theme-preset="meshatlas"] [data-slot="select-trigger"],
+:root[data-theme-preset="meshatlas"] [data-slot="native-select-wrapper"] {
+  border-radius: 0;
+  border-color: oklch(0.3012 0 89.88); /* #2e2e2e line-2 */
+  background-color: oklch(0.1344 0 89.88); /* #080808 */
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="input"]:focus-visible,
+:root[data-theme-preset="meshatlas"] [data-slot="textarea"]:focus-visible,
+:root[data-theme-preset="meshatlas"] [data-slot="select-trigger"]:focus-visible {
+  border-color: var(--muted-foreground);
+  /* 源站只在 focus 时提亮边框，不加发光环；Tailwind 的 ring 走 box-shadow，
+     必须连同 ring 变量一起清零，否则清掉 box-shadow 也没用。 */
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+/* ------------------------------------------------------------------
+   徽标：源站 .chip —— 方角、1px 同色描边、小字大写宽字距。
+   Badge 默认用 rounded-4xl（胶囊），必须显式方角化。
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="badge"] {
+  border-radius: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding-inline: 7px;
+}
+
+/* ------------------------------------------------------------------
+   Tabs：源站 .tab —— 底部 2px 高亮线，非胶囊背景
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="tabs-list"] {
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  padding: 0;
+  height: auto;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="tabs-trigger"] {
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  padding: 11px 12px 9px;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="tabs-trigger"][data-state="active"],
+:root[data-theme-preset="meshatlas"] [data-slot="tabs-trigger"][aria-selected="true"] {
+  background: transparent;
+  color: var(--foreground);
+  border-bottom-color: var(--foreground);
+  box-shadow: none;
+}
+
+/* ------------------------------------------------------------------
+   浮层：源站 .issues/.pal —— #080808 底、1px line-2 描边、深投影。
+
+   关键：这批组件原本用 `ring-1 ring-foreground/10` 做描边，**没有 border**。
+   直接加 border 会与 ring 叠成两条线。正确做法是清掉 ring 变量、
+   改用 inset box-shadow 描边（与 Card 同一套策略）。
+
+   浮层不加四角角标：出现频繁，装饰会从「仪表」退化成「噪音」。
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="dialog-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="alert-dialog-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="popover-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="select-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="hover-card-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="context-menu-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="menubar-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="navigation-menu-viewport"],
+:root[data-theme-preset="meshatlas"] [data-slot="combobox-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="command"],
+:root[data-theme-preset="meshatlas"] [data-slot="sheet-content"],
+:root[data-theme-preset="meshatlas"] [data-slot="drawer-content"] {
+  border-radius: 0;
+  border: 0;
+  background-color: oklch(0.1344 0 89.88); /* #080808 */
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+  box-shadow: inset 0 0 0 1px oklch(0.3012 0 89.88), 0 18px 52px oklch(0 0 0 / 0.7);
+}
+
+/* 遮罩：源站浮层背后的压暗层 */
+:root[data-theme-preset="meshatlas"] [data-slot="dialog-overlay"],
+:root[data-theme-preset="meshatlas"] [data-slot="alert-dialog-overlay"],
+:root[data-theme-preset="meshatlas"] [data-slot="sheet-overlay"],
+:root[data-theme-preset="meshatlas"] [data-slot="drawer-overlay"] {
+  background-color: oklch(0 0 0 / 0.55);
+  backdrop-filter: none;
+}
+
+/* 菜单项 / 选项 / 命令项：方角 + 悬停 6% 白（源站 .pal-row） */
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-checkbox-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-radio-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-sub-trigger"],
+:root[data-theme-preset="meshatlas"] [data-slot="select-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="command-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="context-menu-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="context-menu-checkbox-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="context-menu-radio-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="menubar-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="combobox-item"] {
+  border-radius: 0;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-item"]:hover,
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-item"]:focus,
+:root[data-theme-preset="meshatlas"] [data-slot="select-item"]:focus,
+:root[data-theme-preset="meshatlas"] [data-slot="command-item"][data-selected="true"],
+:root[data-theme-preset="meshatlas"] [data-slot="context-menu-item"]:focus,
+:root[data-theme-preset="meshatlas"] [data-slot="menubar-item"]:focus,
+:root[data-theme-preset="meshatlas"] [data-slot="combobox-item"][data-highlighted] {
+  background: oklch(1 0 0 / 0.06);
+  color: var(--foreground);
+}
+
+/* 下拉/选择器的分隔线、标签、快捷键 */
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-separator"],
+:root[data-theme-preset="meshatlas"] [data-slot="select-separator"],
+:root[data-theme-preset="meshatlas"] [data-slot="command-separator"],
+:root[data-theme-preset="meshatlas"] [data-slot="context-menu-separator"] {
+  background: var(--border);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-label"],
+:root[data-theme-preset="meshatlas"] [data-slot="select-label"],
+:root[data-theme-preset="meshatlas"] [data-slot="command-group"] {
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* 对话框标题/描述：源站面板头的小字大写宽字距 */
+:root[data-theme-preset="meshatlas"] [data-slot="dialog-title"],
+:root[data-theme-preset="meshatlas"] [data-slot="alert-dialog-title"],
+:root[data-theme-preset="meshatlas"] [data-slot="sheet-title"],
+:root[data-theme-preset="meshatlas"] [data-slot="drawer-title"] {
+  letter-spacing: 0.02em;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="dialog-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="alert-dialog-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="sheet-description"],
+:root[data-theme-preset="meshatlas"] [data-slot="drawer-description"] {
+  color: var(--muted-foreground);
+}
+
+/* ------------------------------------------------------------------
+   复选框 / 单选 / 开关的指示块：源站用纯方角小方块
+   （.sw-box::after 10x10 方块；.mx td 单元格也是直角）。
+   Checkbox 内部是硬编码 rounded-[4px]，改为 0。
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox"],
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox-indicator"],
+:root[data-theme-preset="meshatlas"] [data-slot="radio-group-item"],
+:root[data-theme-preset="meshatlas"] [data-slot="radio-group-indicator"] {
+  border-radius: 0;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox"]:focus-visible,
+:root[data-theme-preset="meshatlas"] [data-slot="radio-group-item"]:focus-visible {
+  --tw-ring-shadow: 0 0 #0000;
+  box-shadow: none;
+}
+
+/* 勾选态用实心亮块，而不是源站那种浅灰底：
+   深色界面上「已勾选」必须一眼可辨，--muted(#0f0f0f) 与底色几乎无差，
+   看不出选中状态。这里取 --foreground 作填充、底色作对勾，
+   与源站 .mx td.t0（17% 白填充）同属「高对比实心块」的处理思路。 */
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox"][data-checked],
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox"][aria-checked="true"],
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox"][data-state="checked"] {
+  background-color: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--background);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox"][data-checked] [data-slot="checkbox-indicator"],
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox"][aria-checked="true"] [data-slot="checkbox-indicator"],
+:root[data-theme-preset="meshatlas"] [data-slot="checkbox"][data-state="checked"] [data-slot="checkbox-indicator"] {
+  color: var(--background);
+}
+
+/* 单选组选中态同理 */
+:root[data-theme-preset="meshatlas"] [data-slot="radio-group-item"][data-checked],
+:root[data-theme-preset="meshatlas"] [data-slot="radio-group-item"][aria-checked="true"],
+:root[data-theme-preset="meshatlas"] [data-slot="radio-group-item"][data-state="checked"] {
+  background-color: var(--foreground);
+  border-color: var(--foreground);
+  color: var(--background);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="radio-group-indicator"] {
+  fill: var(--background);
+  color: var(--background);
+}
+
+/* ------------------------------------------------------------------
+   全局直角兜底
+
+   前面按工具类/组件逐个清零，但 ARTEX 有 332 个 data-slot，且业务代码里
+   还有大量内联 rounded-*、hardcode 像素值。枚举必然漏，因此再加一条兜底。
+
+   写法说明：不用 :where(*) —— 它的优先级为 0，会被 Tailwind 的 CSS 压缩
+   当成可丢弃项优化掉（实测产物里根本不出现）。改用显式的后代选择器，
+   保证优先级 (0,1,0) 且一定被保留。
+
+   例外必须是真圆：头像、状态圆点、spinner 等。这些用直角会被误读成
+   「加载失败的占位块」，所以显式放行。
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="card"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="card-header"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="card-content"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="card-footer"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="table-container"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="dialog-content"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="alert-dialog-content"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="sheet-content"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="drawer-content"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="popover-content"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-content"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="select-content"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="command"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-inner"] * {
+  border-radius: 0;
+}
+
+/* 例外：真圆元素放行（头像、spinner、滑块点、单选点） */
+:root[data-theme-preset="meshatlas"] [data-slot="avatar"],
+:root[data-theme-preset="meshatlas"] [data-slot="avatar"] *,
+:root[data-theme-preset="meshatlas"] [data-slot="avatar-image"],
+:root[data-theme-preset="meshatlas"] [data-slot="avatar-fallback"],
+:root[data-theme-preset="meshatlas"] [data-slot="avatar-badge"],
+:root[data-theme-preset="meshatlas"] [data-slot="spinner"],
+:root[data-theme-preset="meshatlas"] [data-slot="slider-thumb"],
+:root[data-theme-preset="meshatlas"] [data-slot="switch-thumb"],
+:root[data-theme-preset="meshatlas"] [data-slot="radio-group-indicator"],
+:root[data-theme-preset="meshatlas"] .rounded-full {
+  border-radius: 9999px;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="kbd"],
+:root[data-theme-preset="meshatlas"] kbd {
+  border-radius: 0;
+  border: 1px solid oklch(0.3012 0 89.88);
+  border-bottom-width: 2px;
+  background: oklch(0.1344 0 89.88);
+  font-size: 10.5px;
+  color: var(--muted-foreground);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="tooltip-content"] {
+  border-radius: 0;
+  border: 1px solid oklch(0.3012 0 89.88);
+  background: oklch(0.1344 0 89.88);
+  font-size: 12px;
+  color: var(--foreground);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="avatar"],
+:root[data-theme-preset="meshatlas"] [data-slot="avatar-image"],
+:root[data-theme-preset="meshatlas"] [data-slot="avatar-fallback"] {
+  border-radius: 0;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="toggle"],
+:root[data-theme-preset="meshatlas"] [data-slot="toggle-group"],
+:root[data-theme-preset="meshatlas"] [data-slot="toggle-group-item"] {
+  border-radius: 0;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="dropdown-menu-shortcut"],
+:root[data-theme-preset="meshatlas"] [data-slot="context-menu-shortcut"],
+:root[data-theme-preset="meshatlas"] [data-slot="command-shortcut"] {
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  color: var(--muted-foreground);
+}
+
+/* ------------------------------------------------------------------
+   探索图（ReactFlow）—— components/exploration-graph.tsx 里写死了浅色，
+   不跟随主题变量，是唯一需要针对性处理的地方：
+
+     className="!bg-[#f0f2f7] dark:!bg-neutral-950"   ← 画布底色写死浅灰蓝
+     bg-white dark:bg-neutral-900                     ← 节点卡片写死纯白
+
+   注意 `!` 前缀是 Tailwind 的 important 修饰，普通类覆盖不了，
+   因此这里也必须用 !important 才能压住。
+------------------------------------------------------------------ */
+
+/* 画布底色：跟随主题的 --background，去掉写死的浅灰蓝 */
+/* 高度：@xyflow/react 的 .react-flow 自身没有 height（见其 base.css），
+   完全依赖外部给尺寸。而 graph-tab 只在**外层 wrapper** 上写了 h-[72vh]，
+   内层没有得到传递，于是画布按内容撑开、把 Card 顶得过高。
+   这里补 100% 让画布填满 wrapper。 */
+:root[data-theme-preset="meshatlas"] .react-flow {
+  background-color: var(--background) !important;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* wrapper → ReactFlowProvider → .react-flow 之间的 div 链必须逐级传递高度，
+   否则中间任何一层 height:auto 都会截断百分比高度。 */
+:root[data-theme-preset="meshatlas"] .react-flow,
+:root[data-theme-preset="meshatlas"] .react-flow__renderer,
+:root[data-theme-preset="meshatlas"] .react-flow__container {
+  flex: 1 1 auto;
+}
+
+/* ReactFlow 的点阵背景层 */
+:root[data-theme-preset="meshatlas"] .react-flow__background {
+  background-color: transparent !important;
+}
+
+:root[data-theme-preset="meshatlas"] .react-flow__background pattern circle {
+  fill: oklch(0.4202 0 89.88) !important;
+}
+
+/* 图节点卡片：bg-white → 主题卡片色 */
+:root[data-theme-preset="meshatlas"] .react-flow__node > div {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--foreground);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+/* 节点连接端口（写死 !bg-white） */
+:root[data-theme-preset="meshatlas"] .react-flow__handle {
+  background-color: var(--card) !important;
+  border-color: var(--muted-foreground) !important;
+}
+
+/* 缩放控件 / 缩略图：容器已是 bg-card，这里补齐描边与方角 */
+:root[data-theme-preset="meshatlas"] .react-flow__controls,
+:root[data-theme-preset="meshatlas"] .react-flow__minimap {
+  border-radius: 0 !important;
+  border: 1px solid var(--border) !important;
+  background-color: var(--card) !important;
+  box-shadow: none !important;
+}
+
+:root[data-theme-preset="meshatlas"] .react-flow__controls-button {
+  border-radius: 0 !important;
+  background-color: var(--card) !important;
+  border-bottom: 1px solid var(--border) !important;
+  color: var(--foreground);
+}
+
+:root[data-theme-preset="meshatlas"] .react-flow__controls-button:hover {
+  background-color: var(--accent) !important;
+}
+
+:root[data-theme-preset="meshatlas"] .react-flow__minimap-mask {
+  fill: oklch(0 0 0 / 0.5) !important;
+}
+
+/* 连线在深色底上要可见（默认浅灰几乎看不见） */
+:root[data-theme-preset="meshatlas"] .react-flow__edge-path {
+  stroke-opacity: 0.9;
+}
+
+/* ------------------------------------------------------------------
+   其他组件：进度条、开关、滑块、骨架屏
+------------------------------------------------------------------ */
+
+:root[data-theme-preset="meshatlas"] [data-slot="progress"] {
+  border-radius: 0;
+  background: oklch(0.1957 0 89.88);
+  height: 6px;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="progress-indicator"] {
+  border-radius: 0;
+  background: var(--primary);
+}
+
+/* 开关按源站 .sw-box 做成方形滑块，而非圆胶囊 */
+:root[data-theme-preset="meshatlas"] [data-slot="switch"] {
+  border-radius: 0;
+  border: 1px solid oklch(0.4202 0 89.88);
+  background: transparent;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="switch"][data-state="checked"] {
+  border-color: var(--foreground);
+  background: transparent;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="switch-thumb"] {
+  border-radius: 0;
+  background: oklch(0.4202 0 89.88);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="switch"][data-state="checked"] [data-slot="switch-thumb"] {
+  background: var(--foreground);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="slider-track"] {
+  border-radius: 0;
+  height: 4px;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="slider-range"] {
+  border-radius: 0;
+  background: var(--primary);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="slider-thumb"] {
+  border-radius: 0;
+  border-color: var(--primary);
+  background: var(--background);
+}
+
+/* 头像保持圆形：直角头像在视觉上会被误读为加载失败的占位块 */
+:root[data-theme-preset="meshatlas"] [data-slot="skeleton"] {
+  border-radius: 0;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="separator"] {
+  background: var(--border);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="alert"] {
+  border-radius: 0;
+  border-style: dashed;
+}
+
+/* 侧栏：源站 .ps 面板，方角 + 1px 描边 */
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-inner"],
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-menu-button"] {
+  border-radius: 0;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-menu-button"]:hover {
+  background: oklch(1 0 0 / 0.05);
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-menu-button"][data-active="true"] {
+  background: oklch(1 0 0 / 0.07);
+  border-left: 2px solid var(--foreground);
+}
+
+/* 滚动条按源站规范：8px、#222 滑块、透明轨道 */
+:root[data-theme-preset="meshatlas"] ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:root[data-theme-preset="meshatlas"] ::-webkit-scrollbar-thumb {
+  background: oklch(0.2178 0 89.88);
+}
+
+:root[data-theme-preset="meshatlas"] ::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.3012 0 89.88);
+}
+
+:root[data-theme-preset="meshatlas"] ::-webkit-scrollbar-track {
+  background: transparent;
+}

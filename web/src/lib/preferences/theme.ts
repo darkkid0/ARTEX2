@@ -28,6 +28,14 @@ export const THEME_PRESET_OPTIONS = [
     },
   },
   {
+    label: "Mesh Atlas",
+    value: "meshatlas",
+    primary: {
+      light: "oklch(0.7871 0.1471 73.02)",
+      dark: "oklch(0.7871 0.1471 73.02)",
+    },
+  },
+  {
     label: "Soft Pop",
     value: "soft-pop",
     primary: {
