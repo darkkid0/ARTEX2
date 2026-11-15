@@ -47,7 +47,9 @@ export function GraphTab({ taskId }: { taskId: string }) {
 
   return (
     <Card>
-      <CardContent className="p-0">
+      {/* px-4 与 Card 自身的 py-(--card-spacing) 对齐：
+         只给 p-0 时图谱会横向顶满，把卡片左右边框盖住（上下有 16px 间隔所以没事）。 */}
+      <CardContent className="p-0 px-4">
         <ExplorationGraph nodes={nodes} edges={edges} className="h-[72vh]" />
       </CardContent>
     </Card>

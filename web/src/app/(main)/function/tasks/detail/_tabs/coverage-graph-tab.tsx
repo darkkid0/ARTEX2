@@ -437,21 +437,66 @@ function networkWorldHeight(renderNodes: RenderNode[]): number {
 }
 
 // G6 的类型把自定义字段归在 data 下，但官方 force 示例（及运行时）按顶层读 d.<field>。
+// G6 画在 <canvas> 上，无法直接使用 CSS 的 var()，必须先把变量解析成具体颜色。
+// 用一个隐藏元素让浏览器完成 oklch/var 的解析，拿到计算后的颜色字符串。
+function resolveThemeColor(name: string, fallback: string): string {
+  if (typeof document === "undefined") return fallback;
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  if (!raw) return fallback;
+  const probe = document.createElement("span");
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.color = raw;
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).color.trim();
+  probe.remove();
+  return resolved || fallback;
+}
+
+// 画布调色板：全部取当前主题的语义色，避免硬编码浅色在深色主题上过亮。
+// 入参的 fallback 是浅色主题下的原值，变量缺失时保持旧观感。
+type CanvasPalette = {
+  fold: string;
+  outOfScope: string;
+  untested: string;
+  label: string;
+  labelBg: string;
+  edge: string;
+  edgeActive: string;
+  strokeActive: string;
+  strokeIdle: string;
+};
+
+function readCanvasPalette(): CanvasPalette {
+  return {
+    fold: resolveThemeColor("--border", "#f1f5f9"),
+    outOfScope: resolveThemeColor("--card", "#e2e8f0"),
+    untested: resolveThemeColor("--muted-foreground", "#94a3b8"),
+    label: resolveThemeColor("--secondary-foreground", "#475569"),
+    labelBg: resolveThemeColor("--card", "rgba(255,255,255,0.75)"),
+    // 连线数量多，用最弱的边框色，否则上百条 1px 线会糊成一片亮网。
+    edge: resolveThemeColor("--border", "#cbd5e1"),
+    edgeActive: resolveThemeColor("--primary", "#0f766e"),
+    strokeActive: resolveThemeColor("--primary", "#0f766e"),
+    strokeIdle: resolveThemeColor("--muted-foreground", "#64748b"),
+  };
+}
+
 // 回调形参用 unknown 满足 G6 签名，内部用 nd() 强转回我们的顶层结构。
 const nd = (d: unknown) => d as G6NodeDatum;
 
 // 已测=实色高亮；范围内未测=灰；范围外/折叠=更淡的灰 + 虚线描边。
-function nodeFill(d: G6NodeDatum, ui: UITranslate): string {
-  if (d.fold) return "#f1f5f9";
-  if (!d.inScope) return "#e2e8f0";
+function nodeFill(d: G6NodeDatum, ui: UITranslate, palette: CanvasPalette): string {
+  if (d.fold) return palette.fold;
+  if (!d.inScope) return palette.outOfScope;
   if (d.tested) return kindMeta(ui)[d.kind].hex;
-  return "#94a3b8";
+  return palette.untested;
 }
-function nodeStroke(d: G6NodeDatum): string {
-  if (d.active) return "#0f766e";
-  if (d.fold || !d.inScope) return "#94a3b8";
-  if (d.tested) return "#0f766e";
-  return "#64748b";
+function nodeStroke(d: G6NodeDatum, palette: CanvasPalette): string {
+  if (d.active) return palette.strokeActive;
+  if (d.fold || !d.inScope) return palette.untested;
+  if (d.tested) return palette.strokeActive;
+  return palette.strokeIdle;
 }
 
 // ---------------------------------------------------------------------------
@@ -704,6 +749,12 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
 
   const containerRef = React.useRef<HTMLDivElement>(null);
   const graphRef = React.useRef<G6Graph | null>(null);
+  // 画布调色板放 ref：主题可能在建图之后才生效（偏好从 cookie 客户端读取），
+  // 届时需要重新解析并刷新，不能只在建图时算一次。
+  const paletteRef = React.useRef<CanvasPalette | null>(null);
+  // 主题切换后重建图：G6 把节点/连线样式固化在位图里，改选项不重算，
+  // 唯一切实可行的刷新方式是销毁重建（主题切换属低频操作，重建代价可接受）。
+  const [themeEpoch, setThemeEpoch] = React.useState(0);
   // click 处理需要最新的 key→RenderNode 映射（G6 事件回调闭包外读 ref）。
   const renderMapRef = React.useRef<Map<string, RenderNode>>(new Map());
   const gDataRef = React.useRef<{ nodes: G6NodeDatum[]; edges: G6EdgeDatum[] }>({
@@ -906,6 +957,30 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
       });
   }, [isCurrentGraph, syncViewport]);
 
+  // 主题可能在建图之后才应用（主题偏好来自 cookie，客户端读取后才落到 <html> 上）。
+  // 这里监听根元素的主题属性，重新解析调色板并刷新画布，避免画布停留在旧配色。
+  React.useEffect(() => {
+    if (typeof window === "undefined" || typeof MutationObserver === "undefined") return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const apply = () => {
+      paletteRef.current = readCanvasPalette();
+      setThemeEpoch((epoch) => epoch + 1);
+    };
+    const schedule = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(apply, 120);
+    };
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "data-theme-preset", "data-theme-mode", "data-font", "style"],
+    });
+    return () => {
+      if (timer) clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, []);
+
   // 建图（一次）。动态 import 避开 SSR/静态导出期的 window 依赖。
   React.useEffect(() => {
     let destroyed = false;
@@ -914,6 +989,10 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
     void (async () => {
       const { Graph } = await import("@antv/g6");
       if (destroyed || !containerRef.current) return;
+      const palette = readCanvasPalette();
+      paletteRef.current = palette;
+      // 样式回调一律走 pal() 实时取值，主题切换后重绘才能拿到新颜色。
+      const pal = () => paletteRef.current ?? palette;
       graph = new Graph({
         container: containerRef.current,
         autoResize: true,
@@ -928,8 +1007,8 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
         node: {
           style: {
             size: (d: unknown) => nd(d).size,
-            fill: (d: unknown) => nodeFill(nd(d), liveUI),
-            stroke: (d: unknown) => nodeStroke(nd(d)),
+            fill: (d: unknown) => nodeFill(nd(d), liveUI, pal()),
+            stroke: (d: unknown) => nodeStroke(nd(d), pal()),
             lineWidth: (d: unknown) => (nd(d).fold || !nd(d).inScope ? 1 : nd(d).tested ? 3 : 1.5),
             lineDash: (d: unknown) => (nd(d).fold || !nd(d).inScope ? [3, 3] : [0]),
             iconSrc: (d: unknown) => nd(d).iconSrc,
@@ -938,9 +1017,9 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
             labelText: (d: unknown) => nd(d).lbl,
             labelFontSize: () => (viewModeRef.current === "network" ? 9 : 10),
             labelPlacement: "bottom",
-            labelFill: "#475569",
+            labelFill: () => pal().label,
             labelBackground: true,
-            labelBackgroundFill: "rgba(255,255,255,0.75)",
+            labelBackgroundFill: () => pal().labelBg,
             labelBackgroundRadius: 3,
             labelPadding: [1, 3],
             opacity: (d: unknown) => (gDataRef.current.nodes.some((node) => node.active) && !nd(d).active ? 0.5 : 1),
@@ -948,7 +1027,7 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
         },
         edge: {
           style: {
-            stroke: (d: unknown) => ((d as G6EdgeDatum).active ? "#0f766e" : "#cbd5e1"),
+            stroke: (d: unknown) => ((d as G6EdgeDatum).active ? pal().edgeActive : pal().edge),
             lineWidth: (d: unknown) => ((d as G6EdgeDatum).active ? 2.5 : 1),
             opacity: (d: unknown) =>
               gDataRef.current.edges.some((edge) => edge.active) && !(d as G6EdgeDatum).active ? 0.18 : 1,
@@ -1009,7 +1088,7 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
       }
       if (graph && !graph.destroyed) graph.destroy();
     };
-  }, [applyData, isCurrentGraph, syncViewport, liveUI]);
+  }, [applyData, isCurrentGraph, syncViewport, liveUI, themeEpoch]);
 
   // 可见集合变化 → 重新灌数据 + 布局。sig 只作为重排触发器（applyData 读 gDataRef）。
   // biome-ignore lint/correctness/useExhaustiveDependencies: sig 是刻意的重排触发依赖
@@ -1038,7 +1117,9 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
   const inScope = data?.nodes.filter((n) => n.in_scope).length ?? 0;
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-slate-100/80 dark:bg-slate-950/30">
+    // 底色用主题变量：这一层是画布与分区背景的共同底板，
+    // 写死 slate 浅色会在深色主题下透出一道亮底，也会盖住 z-0 的标题层。
+    <div className="bg-background relative h-full w-full overflow-hidden">
       {viewMode === "network" ? (
         <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
           <div
@@ -1077,6 +1158,8 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
           <div className="text-muted-foreground mt-0.5 text-[11px]">{ui("screen.e55034530fb968")}</div>
         </div>
       )}
+      {/* 画布保持透明，底色由外层容器提供（CSS 随主题即时变化，不受 G6 位图影响）。
+          这一层若加不透明底色，会把 z-0 的标题层和分区背景一起遮住。 */}
       <div ref={containerRef} className="relative z-10 h-full w-full pt-12" />
 
       {/* 图例 + 统计 + 刷新（叠加层） */}
@@ -1338,7 +1421,7 @@ function GraphInner({ taskId, coverageEnabled = true }: { taskId: string; covera
 export function CoverageGraphTab({ taskId, coverageEnabled = true }: { taskId: string; coverageEnabled?: boolean }) {
   return (
     <Card>
-      <CardContent className="p-0">
+      <CardContent className="p-0 px-4">
         <div className="h-[72vh] w-full overflow-hidden rounded-xl">
           <GraphInner taskId={taskId} coverageEnabled={coverageEnabled} />
         </div>
