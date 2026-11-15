@@ -163,7 +163,8 @@ export function FilesTab({ task, active }: { task: Task; active: boolean }) {
   else for (const entry of summary?.entries ?? []) rows.push({ entry, depth: 0 });
 
   return (
-    <div className="flex flex-col gap-4">
+    // 同会话页面板：实色底 + 细边框，避免内容直接压在背景网格上。
+    <div className="bg-card flex min-w-0 flex-col gap-4 rounded-lg border p-4">
       <p className="text-muted-foreground text-sm">{ui("taskFiles.scope")}</p>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant={mode === "tree" ? "secondary" : "ghost"} onClick={() => setMode("tree")}>

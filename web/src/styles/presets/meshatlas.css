@@ -92,12 +92,20 @@ value: meshatlas
    「内容块浮于图纸之上」的层次感。
 ------------------------------------------------------------------ */
 
-/* 1) 承载纹理的外壳层：透明 + 提升到纹理之上 */
+/* 1) 外壳层：保留主题底色，让纹理只出现在侧栏区域。
+
+   注意 sidebar-inset（主内容区）必须保持不透明：
+   它是内容区最外层的实色底板，一旦设成 transparent，固定定位的网格纹理会
+   从每个"没有用 Card 包裹内容"的页面里透出来，表现为「内容区没有背景」。
+   把这里设为 transparent 曾经导致几十个页面都出现该问题。 */
 :root[data-theme-preset="meshatlas"] [data-slot="sidebar-wrapper"],
-:root[data-theme-preset="meshatlas"] [data-slot="sidebar-inset"],
 :root[data-theme-preset="meshatlas"] [data-slot="sidebar-inner"],
 :root[data-theme-preset="meshatlas"] [data-slot="sidebar-container"] {
   background-color: transparent;
+}
+
+:root[data-theme-preset="meshatlas"] [data-slot="sidebar-inset"] {
+  background-color: var(--background);
 }
 
 :root[data-theme-preset="meshatlas"] [data-slot="sidebar-wrapper"] {
@@ -183,19 +191,64 @@ value: meshatlas
      · sticky           —— 表头 / 行首的吸附列，本身不是面板
      · backdrop         —— 半透明毛玻璃浮层
      · bg-card/         —— 带透明度的浮层（Tailwind 的 /95 语法）
+     · react-flow       —— ReactFlow 自带的 Panel（图例/缩放控件/缩略图）。
+       它们的 class 里恰好有 !bg-card + !border + !rounded-lg，会被本条命中，
+       而本条会写 position:relative，直接摧毁 Panel 的绝对定位 ——
+       缩略图因此从右下角掉到左上角、边框消失、还多出一块占位。
 ------------------------------------------------------------------ */
 
 :root[data-theme-preset="meshatlas"] div[class*="bg-card"][class*="border"][class*="rounded"]:not(
     [class*="absolute"]
   ):not([class*="fixed"]):not([class*="sticky"]):not([class*="backdrop"]):not(
     [class*="bg-card/"]
-  ):not([data-slot]) {
+  ):not([data-slot]):not([class*="react-flow"]) {
   position: relative;
   /* 必须清掉原有 border：这批容器已带 `border`（1px 实线），
      若再叠 inset shadow 会变成 2px 双线，而角标只有 1px —— 边宽角细对不上。 */
   border: 0;
   box-shadow: inset 0 0 0 1px var(--border);
   background-image: linear-gradient(180deg, oklch(1 0 0 / 0.022), oklch(1 0 0 / 0.008));
+}
+
+/* 页面级面板：ARTEX 有些页面用「裸边框容器」当主面板（无 bg-* 类），
+   例如 repeater 的编辑器分栏 `rounded-md border p-2`、skills 的卡片
+   `rounded-lg border p-3`、审批页外层 `rounded-xl border`。
+   这类元素不匹配上面的 bg-card 判据，于是没有角标。
+
+   判据补一条：带 border + rounded，且**同时**具有 overflow-hidden 或 min-h-* 特征。
+   这两个特征能把「面板」和「chip / 输入框 / 小徽标」区分开 ——
+   后者几乎不会带 overflow-hidden 或 min-height。 */
+:root[data-theme-preset="meshatlas"] div[class~="border"][class*="rounded"][class*="overflow-hidden"]:not(
+    [class*="react-flow"]
+  ):not([data-slot]):not([class*="absolute"]):not([class*="fixed"]),
+:root[data-theme-preset="meshatlas"] div[class~="border"][class*="rounded"][class*="min-h-"]:not(
+    [class*="react-flow"]
+  ):not([data-slot]):not([class*="absolute"]):not([class*="fixed"]) {
+  position: relative;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+
+:root[data-theme-preset="meshatlas"] div[class~="border"][class*="rounded"][class*="overflow-hidden"]:not(
+    [class*="react-flow"]
+  ):not([data-slot]):not([class*="absolute"]):not([class*="fixed"])::before,
+:root[data-theme-preset="meshatlas"] div[class~="border"][class*="rounded"][class*="min-h-"]:not(
+    [class*="react-flow"]
+  ):not([data-slot]):not([class*="absolute"]):not([class*="fixed"])::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --tick: oklch(0.4202 0 89.88);
+  --tick-len: 12px;
+  background:
+    linear-gradient(var(--tick), var(--tick)) top left / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top left / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) top right / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom left / 1px var(--tick-len) no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / var(--tick-len) 1px no-repeat,
+    linear-gradient(var(--tick), var(--tick)) bottom right / 1px var(--tick-len) no-repeat;
 }
 
 /* 面板内部的分组块（bg-muted + border，对应源站 .grp）：
@@ -222,7 +275,7 @@ value: meshatlas
     [class*="absolute"]
   ):not([class*="fixed"]):not([class*="sticky"]):not([class*="backdrop"]):not(
     [class*="bg-card/"]
-  ):not([data-slot])::before {
+  ):not([data-slot]):not([class*="react-flow"])::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -827,11 +880,39 @@ value: meshatlas
 }
 
 /* 图节点卡片：bg-white → 主题卡片色 */
-:root[data-theme-preset="meshatlas"] .react-flow__node > div {
-  background-color: var(--card) !important;
-  border-color: var(--border) !important;
-  color: var(--foreground);
-  box-shadow: inset 0 0 0 1px var(--border);
+/* 组件已改用主题色（bg-card / border-border），这里不再重复描边 ——
+   若再加 inset shadow 会与 border 叠成 2px 双线。 */
+:root[data-theme-preset="meshatlas"] .react-flow {
+  /* ReactFlow 自身的一套 CSS 变量，直接用主题色覆盖，
+     比逐个择子元素写 background-color 更稳。 */
+  --xy-background-color: var(--background);
+  --xy-node-background-color: var(--card);
+  --xy-node-border-color: var(--border);
+  --xy-node-color: var(--foreground);
+  --xy-minimap-background-color: var(--card);
+  --xy-minimap-node-background-color: var(--muted-foreground);
+  --xy-minimap-mask-background-color: oklch(0 0 0 / 0.5);
+  --xy-edge-stroke-default: oklch(0.5795 0 89.88);
+  --xy-edge-label-background-color: var(--card);
+  --xy-controls-button-background-color: var(--card);
+  --xy-controls-button-background-color-hover: var(--accent);
+  --xy-controls-button-color: var(--foreground);
+  --xy-controls-button-border-color: var(--border);
+}
+
+/* ReactFlow 的浮层（图例 / 缩放控件 / 缩略图）边框。
+   这三个 Panel 用的是 Tailwind 的 `border`（颜色取 --border = #1f1f1f），
+   在 #0a0a0a 的卡片底上对比度太低：横线尚可，竖线因 1px 抗锯齿被摊到
+   相邻像素后基本看不见，观感就是「只有上下边框」。这里提到 #2e2e2e。 */
+:root[data-theme-preset="meshatlas"] .react-flow__panel {
+  --border: oklch(0.3012 0 89.88);
+}
+
+/* 缩略图：限制尺寸后仍要压住默认白底 */
+:root[data-theme-preset="meshatlas"] .react-flow__minimap {
+  background: var(--card) !important;
+  max-width: 180px;
+  max-height: 120px;
 }
 
 /* 节点连接端口（写死 !bg-white） */
